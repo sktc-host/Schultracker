@@ -2,33 +2,9 @@
   "name": "Salvatorkolleg Ferien & Stunden Tracker",
   "short_name": "Schultracker",
   "description": "Verfolge dein Schuljahr, Ferien und Schulstunden",
-  "start_url": "/Schultracker/",
+  "start_url": "/Schultracker/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
-  "scope": "/Schultracker/",
-  "icons": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%234f46e5' width='192' height='192'/><text x='50%' y='50%' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>SK</text></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%234f46e5' width='180' height='180'/><text x='50%' y='50%' font-size='72' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>SK</text></svg>",
-      "sizes": "180x180",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
-    }
-  ],
-  "categories": ["education", "productivity"],
-  "shortcuts": [
-    {
-      "name": "Einstellungen",
-      "short_name": "Einstellungen",
-      "description": "Öffne die Einstellungen",
-      "url": "/?tab=settings",
-      "icons": []
-    }
-  ]
+  "scope": "/Schultracker/"
 }
