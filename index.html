@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Salvatorkolleg — Ferien & Stunden Tracker</title>
+    <!-- Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .mono-time { font-variant-numeric: tabular-nums; }
+        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .card { transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+
+        /* Custom alert modal */
+        .alert-modal {
+            animation: fadeInOut 3s forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+    <div id="root" class="min-h-screen p-4 sm:p-8 flex items-center justify-center"></div>
+
+    <!-- React + ReactDOM UMD -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel standalone to compile JSX in-browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useEffect, useMemo, useState } = React;
+
+        // --- Constants ---
+        const DEFAULT_TIMEZONE = "Europe/Berlin";
+        const DEFAULT_SCHOOL_YEAR = { start: "2025-09-14", end: "2026-07-29" };
+        const DEFAULT_VACATIONS = {
+            Herbstferien: { from: "2025-10-25", to: "2025-11-02" },
+            Weihnachtsferien: { from: "2025-12-20", to: "2026-01-06" },
+            Fasnachtsferien: { from: "2026-02-13", to: "2026-02-22" },
+            Osterferien: { from: "2026-03-28", to: "2026-04-12" },
+            Pfingstferien: { from: "2026-05-23", to: "2026-06-07" },
+            Sommerferien: { from: "2026-07-30", to: "2026-09-13" }
+        };
+        const DEFAULT_PUBLIC_HOLIDAYS = [
+            "2025-10-03","2025-11-01","2025-12-25","2025-12-26","2026-01-01","2026-01-06",
+            "2026-04-03","2026-04-06","2026-05-01","2026-05-14","2026-05-25","2026-06-04","2026-07-10"
+        ];
+        const SCHOOL_HOURS = [
+            { nr: 1, start: "07:45", end: "08:30" },
+            { nr: 2, start: "08:35", end: "09:20" },
+            { nr: 3, start: "09:40", end: "10:25" },
+            { nr: 4, start: "10:25", end: "11:10" },
+            { nr: 5, start: "11:20", end: "12:05" },
+            { nr: 6, start: "12:10", end: "12:55" },
+            { nr: 7, start: "13:25", end: "14:10" },
+            { nr: 8, start: "14:15", end: "15:00" },
+            { nr: 9, start: "15:05", end: "15:50" },
+            { nr: 10, start: "15:55", end: "16:40" }
+        ];
+        const DEFAULT_WEEKLY_HOURS = { monday: 9, tuesday: 6, wednesday: 6, thursday: 9, friday: 5, saturday: 0, sunday: 0 };
+
+        // --- Helpers ---
+        function toDateISO(s){ if(!s) return null; const d = new Date(s + "T00:00:00"); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+        function daysBetween(a,b){ const _a = new Date(a.getFullYear(), a.getMonth(), a.getDate()); const _b = new Date(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((+_b - +_a) / (1000*60*60*24)); }
+        function dateAddDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
+        function formatDate(d){ if(!d) return "—"; return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" }); }
+        function iterateDates(from,to){ const arr=[]; let cur = new Date(from); while(cur <= to){ arr.push(new Date(cur)); cur = dateAddDays(cur,1); } return arr; }
+        function getCurrentLesson(now){ const currentTime = now.toTimeString().slice(0,5); for(const hour of SCHOOL_HOURS){ if(currentTime >= hour.start && currentTime <= hour.end) return hour; } return null; }
+        
+        // Custom message component
+        function AlertModal({ message, onClose }) {
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    onClose();
+                }, 3000); // Hide after 3 seconds
+                return () => clearTimeout(timer);
+            }, [message, onClose]);
+
+            if (!message) return null;
+            return (
+                <div className="fixed inset-0 flex items-start justify-center p-4 z-50 pointer-events-none">
+                    <div className="alert-modal bg-slate-900/90 text-white px-6 py-3 rounded-lg shadow-xl text-center backdrop-blur-sm pointer-events-auto border border-slate-700">
+                        {message}
+                    </div>
+                </div>
+            );
+        }
+
+        // --- App ---
+        function App(){
+            // state
+            const [today, setToday] = useState(new Date());
+            const [schoolYear, setSchoolYear] = useState(() => JSON.parse(localStorage.getItem('school_year') || JSON.stringify(DEFAULT_SCHOOL_YEAR)));
+            const [vacations, setVacations] = useState(() => JSON.parse(localStorage.getItem('vacations') || JSON.stringify(DEFAULT_VACATIONS)));
+            const [publicHolidays, setPublicHolidays] = useState(() => JSON.parse(localStorage.getItem('public_holidays') || JSON.stringify(DEFAULT_PUBLIC_HOLIDAYS)));
+            const [weeklyHours, setWeeklyHours] = useState(() => JSON.parse(localStorage.getItem('weekly_hours') || JSON.stringify(DEFAULT_WEEKLY_HOURS)));
+
+            const [showSettings, setShowSettings] = useState(false);
+            const [showLogin, setShowLogin] = useState(false);
+            const [showRegister, setShowRegister] = useState(false);
+            const [darkMode, setDarkMode] = useState(() => JSON.parse(localStorage.getItem('dark_mode') || 'false'));
+            const [alertMessage, setAlertMessage] = useState(null);
+
+            // simple local "backend" using localStorage for demo
+            const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('users') || JSON.stringify([{ username: 'test', password: '1234' }])));
+            const [loggedInUser, setLoggedInUser] = useState(() => localStorage.getItem('logged_user') || null);
+
+            useEffect(()=>{ const t = setInterval(()=>setToday(new Date()), 1000); return ()=>clearInterval(t); }, []);
+            useEffect(()=>{ localStorage.setItem('school_year', JSON.stringify(schoolYear)); localStorage.setItem('vacations', JSON.stringify(vacations)); localStorage.setItem('public_holidays', JSON.stringify(publicHolidays)); localStorage.setItem('weekly_hours', JSON.stringify(weeklyHours)); }, [schoolYear, vacations, publicHolidays, weeklyHours]);
+            useEffect(()=>{ localStorage.setItem('dark_mode', JSON.stringify(darkMode)); if(darkMode) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); }, [darkMode]);
+            useEffect(()=>{ localStorage.setItem('users', JSON.stringify(users)); }, [users]);
+            useEffect(()=>{ if(loggedInUser) localStorage.setItem('logged_user', loggedInUser); else localStorage.removeItem('logged_user'); }, [loggedInUser]);
+
+            // adjusted clock (42s ahead)
+            const adjustedNow = useMemo(()=> new Date(today.getTime() + 42*1000), [today]);
+
+            // parsed data
+            const parsedVacations = useMemo(()=>{ const out = {}; Object.entries(vacations).forEach(([k,v])=>{ if(!v || !v.from) return (out[k]=null); out[k] = { from: toDateISO(v.from), to: toDateISO(v.to) }; }); return out; }, [vacations]);
+            const parsedPublicHolidays = useMemo(()=> new Set(publicHolidays.map(d=> toDateISO(d).toDateString() )), [publicHolidays]);
+            const schoolStart = toDateISO(schoolYear.start); const schoolEnd = toDateISO(schoolYear.end);
+
+            function isSchoolDay(d){ const day = d.getDay(); if(day ===0 || day ===6) return false; if(parsedPublicHolidays.has(d.toDateString())) return false; for(const v of Object.values(parsedVacations)){ if(!v) continue; if(d >= v.from && d <= v.to) return false; } if(d < schoolStart || d > schoolEnd) return false; return true; }
+
+            function computeUntil(dateFrom, dateTo){ if(!dateTo) return null; const from = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate()); const to = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate()); const totalDays = daysBetween(from,to); let schoolDays=0; let schoolHours=0; let cur = new Date(from); while(cur < to){ if(isSchoolDay(cur)){ schoolDays++; const weekday = cur.getDay(); let hours = 0; if(weekday === 1) hours = weeklyHours.monday; if(weekday === 2) hours = weeklyHours.tuesday; if(weekday === 3) hours = weeklyHours.wednesday; if(weekday === 4) hours = weeklyHours.thursday; if(weekday === 5) hours = weeklyHours.friday; schoolHours += hours; } cur = dateAddDays(cur,1); } return { totalDays, schoolDays, schoolHours }; }
+
+            const upcomingVacations = useMemo(()=>{ const list = []; Object.entries(parsedVacations).forEach(([k,v])=>{ if(!v) return; if(v.to < adjustedNow) return; list.push({ name: k, from: v.from, to: v.to }); }); list.sort((a,b)=> +a.from - +b.from); return list; }, [parsedVacations, adjustedNow]);
+
+            const totalSchoolDaysInYear = useMemo(()=>{ let cnt = 0; const days = iterateDates(schoolStart, schoolEnd); for(const d of days) if(isSchoolDay(d)) cnt++; return cnt; }, [schoolStart, schoolEnd, parsedVacations, parsedPublicHolidays, weeklyHours]);
+            const passedSchoolDays = useMemo(()=>{ let cnt=0; const days = iterateDates(schoolStart, adjustedNow); for(const d of days) if(isSchoolDay(d) && d <= adjustedNow) cnt++; return cnt; }, [schoolStart, adjustedNow, parsedVacations, parsedPublicHolidays]);
+
+            const percentComplete = totalSchoolDaysInYear ? Math.round((passedSchoolDays / totalSchoolDaysInYear) * 100) : 0;
+            const summer = parsedVacations.Sommerferien; const untilSummer = summer ? computeUntil(adjustedNow, summer.from) : null;
+            const currentLesson = getCurrentLesson(adjustedNow);
+
+            const todaySchoolHours = useMemo(()=>{ if(!isSchoolDay(adjustedNow)) return 0; const weekday = adjustedNow.getDay(); let hours=0; if(weekday===1) hours = weeklyHours.monday; if(weekday===2) hours = weeklyHours.tuesday; if(weekday===3) hours = weeklyHours.wednesday; if(weekday===4) hours = weeklyHours.thursday; if(weekday===5) hours = weeklyHours.friday; return hours; }, [adjustedNow, weeklyHours]);
+
+            const percentDayComplete = useMemo(()=>{ if(!isSchoolDay(adjustedNow) || todaySchoolHours === 0) return 0; const relevantHours = SCHOOL_HOURS.filter(h => h.nr <= todaySchoolHours); if(relevantHours.length === 0) return 0; const startTime = relevantHours[0].start; const endTime = relevantHours[relevantHours.length -1].end; const [sh, sm] = startTime.split(":").map(Number); const [eh, em] = endTime.split(":").map(Number); const startMinutes = sh*60 + sm; const endMinutes = eh*60 + em; const nowMinutes = adjustedNow.getHours()*60 + adjustedNow.getMinutes(); const progress = Math.min(Math.max(nowMinutes - startMinutes, 0), endMinutes - startMinutes); return Math.round((progress / (endMinutes - startMinutes)) * 100); }, [adjustedNow, todaySchoolHours]);
+
+            // authentication helpers (local demo)
+            function registerUser(username, password){ if(!username || !password) return { ok:false, message: 'Benutzername & Passwort erforderlich' }; if(users.some(u=>u.username === username)) return { ok:false, message: 'Benutzername existiert' }; const newUsers = [...users, { username, password }]; setUsers(newUsers); return { ok:true }; }
+            function loginUser(username, password){ const found = users.find(u=>u.username === username && u.password === password); if(found){ setLoggedInUser(found.username); return { ok:true }; } return { ok:false, message: 'Ungültige Daten' }; }
+            function logoutUser(){ setLoggedInUser(null); }
+
+            // UI state for forms
+            const [formLoginUser, setFormLoginUser] = useState('');
+            const [formLoginPass, setFormLoginPass] = useState('');
+            const [formRegUser, setFormRegUser] = useState('');
+            const [formRegPass, setFormRegPass] = useState('');
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                const res = loginUser(formLoginUser.trim(), formLoginPass);
+                if (!res.ok) {
+                    setAlertMessage(res.message);
+                } else {
+                    setShowLogin(false);
+                    setFormLoginPass('');
+                    setFormLoginUser('');
+                    setAlertMessage('Erfolgreich angemeldet!');
+                }
+            };
+
+            const handleRegister = (e) => {
+                e.preventDefault();
+                const res = registerUser(formRegUser.trim(), formRegPass);
+                if (!res.ok) {
+                    setAlertMessage(res.message);
+                } else {
+                    setAlertMessage('Registrierung erfolgreich — bitte melden Sie sich an.');
+                    setShowRegister(false);
+                    setFormRegPass('');
+                    setFormRegUser('');
+                }
+            };
+
+            return (
+                <div className="w-full max-w-6xl mx-auto flex items-center justify-center min-h-screen p-4 sm:p-8">
+                    <div className="w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-6 sm:p-10 transition-colors duration-300">
+                        <header className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-200 dark:border-slate-700">
+                            <div className="flex-1 text-center md:text-left">
+                                <h1 className="text-3xl sm:text-4xl font-extrabold text-indigo-700 dark:text-indigo-400">Salvatorkolleg</h1>
+                                <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Ferien & Stunden Tracker</p>
+                                <p className="text-sm mt-1 text-slate-500">Standort: Bad Wurzach, Ferien-BW | Zeitzone: {DEFAULT_TIMEZONE}</p>
+                            </div>
+                            <div className="text-center md:text-right flex flex-col items-center md:items-end gap-2">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">Aktuelle Uhrzeit</div>
+                                <div className="text-xl font-bold text-slate-900 dark:text-white mono-time bg-indigo-50 dark:bg-slate-700/50 py-1 px-4 rounded-lg shadow-inner">
+                                    {adjustedNow.toLocaleTimeString()}
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                    {loggedInUser && (
+                                        <button className="px-4 py-2 text-sm font-medium rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all" onClick={() => setShowSettings(s => !s)}>
+                                            {showSettings ? 'Einstellungen schließen' : 'Einstellungen'}
+                                        </button>
+                                    )}
+                                    {!loggedInUser ? (
+                                        <button className="px-4 py-2 text-sm font-medium rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 transition-all" onClick={() => setShowLogin(true)}>Anmelden</button>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-slate-500">Angemeldet als <strong>{loggedInUser}</strong></span>
+                                            <button className="px-4 py-2 text-sm font-medium rounded-full bg-red-500 hover:bg-red-600 text-white transition-all" onClick={() => { logoutUser(); setAlertMessage('Abgemeldet.'); }}>Abmelden</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </header>
+
+                        <main className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Section: School Year Progress */}
+                            <section className="lg:col-span-2">
+                                <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-400 mb-4">Schuljahr & Tagesfortschritt</h2>
+                                <div className="bg-white dark:bg-slate-700/50 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700">
+                                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Schuljahr</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{percentComplete}% des Schuljahres geschafft ({passedSchoolDays} von {totalSchoolDaysInYear} Schultagen)</p>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-3 mt-3 overflow-hidden">
+                                        <div className="bg-indigo-500 h-3 rounded-full transition-all duration-500" style={{ width: `${percentComplete}%` }}></div>
+                                    </div>
+                                    
+                                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mt-6">Heutiger Schultag</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Stunden: {todaySchoolHours} | Fortschritt: {percentDayComplete}%</p>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-3 mt-3 overflow-hidden">
+                                        <div className="bg-emerald-500 h-3 rounded-full transition-all duration-500" style={{ width: `${percentDayComplete}%` }}></div>
+                                    </div>
+
+                                    <div className="mt-6 flex items-center justify-between">
+                                        {currentLesson ? (
+                                            <p className="text-md font-semibold text-emerald-600 dark:text-emerald-400">
+                                                Aktuelle Stunde: {currentLesson.nr} ({currentLesson.start} – {currentLesson.end})
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">Kein Unterricht im Moment.</p>
+                                        )}
+                                        <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                                            <span>Heute:</span>
+                                            <span className="bg-slate-200 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 py-1 px-3 rounded-md font-medium">
+                                                {formatDate(adjustedNow)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Section: Vacation Countdown */}
+                            <section className="lg:col-span-1">
+                                <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-400 mb-4">Sommerferien-Countdown</h2>
+                                {untilSummer ? (
+                                    <div className="bg-white dark:bg-slate-700/50 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700">
+                                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Bis zu den Sommerferien sind es noch...</h3>
+                                        <div className="mt-4 space-y-3 text-slate-600 dark:text-slate-300">
+                                            <div className="flex items-center gap-3">
+                                                <span className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 py-1 px-3 rounded-md font-bold text-lg">{untilSummer.totalDays}</span> Kalendertage
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 py-1 px-3 rounded-md font-bold text-lg">{untilSummer.schoolDays}</span> Schultage
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 py-1 px-3 rounded-md font-bold text-lg">{untilSummer.schoolHours}</span> Schulstunden
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-white dark:bg-slate-700/50 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                                        Sommerferien-Datum nicht festgelegt.
+                                    </div>
+                                )}
+                            </section>
+                        </main>
+
+                        {/* Section: Upcoming Vacations */}
+                        <section className="mt-8">
+                            <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-400 mb-4">Bevorstehende Ferien</h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                                {upcomingVacations.map(v => {
+                                    const until = computeUntil(adjustedNow, v.from);
+                                    return (
+                                        <div key={v.name} className="card bg-white dark:bg-slate-700/50 p-6 rounded-2xl shadow-lg hover:shadow-xl border border-slate-200 dark:border-slate-700">
+                                            <h3 className="font-semibold text-lg text-indigo-800 dark:text-indigo-300 mb-2">{v.name}</h3>
+                                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                                <span className="bg-slate-100 dark:bg-slate-700 py-1 px-2 rounded-md font-mono">{formatDate(v.from)}</span> – <span className="bg-slate-100 dark:bg-slate-700 py-1 px-2 rounded-md font-mono">{formatDate(v.to)}</span>
+                                            </p>
+                                            {until && (
+                                                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                                                    Noch <span className="font-bold">{until.schoolDays} Schultage</span> und <span className="font-bold">{until.schoolHours} Stunden</span> bis zum Start.
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+
+                        {/* Modals */}
+                        {showSettings && loggedInUser && (
+                            <div className="fixed inset-0 flex items-center justify-center p-4 modal-bg z-40">
+                                <div className="card bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 sm:p-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                                    <div className="flex justify-between items-center pb-4 mb-6 border-b border-slate-200 dark:border-slate-700">
+                                        <h3 className="text-2xl font-bold">Einstellungen</h3>
+                                        <div className="flex items-center gap-4">
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <input type="checkbox" className="accent-indigo-600 w-4 h-4" checked={darkMode} onChange={() => setDarkMode(d => !d)} />
+                                                <span>Dark Mode</span>
+                                            </label>
+                                            <button className="px-4 py-2 bg-slate-200 dark:bg-slate-700 dark:text-white rounded-full text-sm" onClick={() => setShowSettings(false)}>
+                                                Fertig
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Schuljahr Start</label>
+                                            <input type="date" value={schoolYear.start} onChange={(e) => setSchoolYear(s => ({ ...s, start: e.target.value }))} className="mt-1 w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Schuljahr Ende</label>
+                                            <input type="date" value={schoolYear.end} onChange={(e) => setSchoolYear(s => ({ ...s, end: e.target.value }))} className="mt-1 w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8">
+                                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Wochenstunden (Mo–Fr)</label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                                            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map((day, i) => (
+                                                <div key={day}>
+                                                    <span className="block text-xs text-center text-slate-500 mb-1">{day.slice(0, 2).toUpperCase()}</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={weeklyHours[day]}
+                                                        onChange={(e) => setWeeklyHours(w => ({ ...w, [day]: Number(e.target.value) }))}
+                                                        className="p-3 w-full rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700 text-center"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-8">
+                                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Ferien & Feiertage</label>
+                                        <div className="grid md:grid-cols-2 gap-4 max-h-64 overflow-y-auto pr-2">
+                                            {Object.entries(vacations).map(([k, v]) => (
+                                                <div key={k} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-slate-100 dark:bg-slate-700/50 rounded-lg">
+                                                    <div className="w-full sm:w-28 text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{k}</div>
+                                                    <input type="date" value={v.from} onChange={(e) => setVacations(prev => ({ ...prev, [k]: { ...prev[k], from: e.target.value } }))} className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-800" />
+                                                    <input type="date" value={v.to} onChange={(e) => setVacations(prev => ({ ...prev, [k]: { ...prev[k], to: e.target.value } }))} className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-800" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {showLogin && (
+                            <div className="fixed inset-0 flex items-center justify-center p-4 modal-bg z-50">
+                                <div className="card bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-sm relative">
+                                    <button className="absolute top-4 right-4 text-slate-500 hover:text-red-500 transition-colors" onClick={() => setShowLogin(false)}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                    <h3 className="text-2xl font-bold mb-5 text-center">Anmelden</h3>
+                                    <form onSubmit={handleLogin} className="space-y-4">
+                                        <input placeholder="Benutzername" value={formLoginUser} onChange={(e) => setFormLoginUser(e.target.value)} className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+                                        <input type="password" placeholder="Passwort" value={formLoginPass} onChange={(e) => setFormLoginPass(e.target.value)} className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+                                        <div className="flex flex-col sm:flex-row sm:justify-between items-center pt-2">
+                                            <button type="button" className="text-sm text-indigo-600 hover:underline mb-2 sm:mb-0" onClick={() => { setShowLogin(false); setShowRegister(true); }}>
+                                                Neu hier? Jetzt registrieren!
+                                            </button>
+                                            <button type="submit" className="w-full sm:w-auto px-6 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-md transition-all">
+                                                Einloggen
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {showRegister && (
+                            <div className="fixed inset-0 flex items-center justify-center p-4 modal-bg z-50">
+                                <div className="card bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-sm relative">
+                                    <button className="absolute top-4 right-4 text-slate-500 hover:text-red-500 transition-colors" onClick={() => setShowRegister(false)}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                    <h3 className="text-2xl font-bold mb-5 text-center">Registrieren</h3>
+                                    <form onSubmit={handleRegister} className="space-y-4">
+                                        <input placeholder="Wunsch-Benutzername" value={formRegUser} onChange={(e) => setFormRegUser(e.target.value)} className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+                                        <input type="password" placeholder="Passwort" value={formRegPass} onChange={(e) => setFormRegPass(e.target.value)} className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700" />
+                                        <div className="flex justify-end pt-2">
+                                            <button type="submit" className="w-full sm:w-auto px-6 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md transition-all">
+                                                Konto anlegen
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+                        <AlertModal message={alertMessage} onClose={() => setAlertMessage(null)} />
+                    </div>
+                </div>
+            );
+        }
+
+        // render
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
