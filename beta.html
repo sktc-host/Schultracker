@@ -9,6 +9,32 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuGwAx6Ck4IMURmgpc3slqvK6PA3p-JNc",
+      authDomain: "schultracker.firebaseapp.com",
+      projectId: "schultracker",
+      storageBucket: "schultracker.firebasestorage.app",
+      messagingSenderId: "21307451298",
+      appId: "1:21307451298:web:e714f18e10a08ef49574fb"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Make Firebase auth available globally
+    window.firebaseAuth = {
+      auth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    };
+  </script>
   <style>
     body{font-family:'Inter',sans-serif} 
     .mono-time { font-variant-numeric: tabular-nums; }
@@ -40,7 +66,7 @@
 
     function useNow(interval=1000, offsetMs=0){ const [now, setNow] = useState(new Date()); useEffect(()=>{ const t = setInterval(()=> setNow(new Date()), interval); return ()=> clearInterval(t); }, [interval]); return useMemo(()=> new Date(now.getTime() + offsetMs), [now, offsetMs]); }
 
-    function Nav({active, onChange, dark, setDark}){
+    function Nav({active, onChange, dark, setDark, user, onLogout}){
       return (
         <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -57,7 +83,14 @@
               </div>
               <div className="flex items-center gap-3">
                 <button onClick={()=>setDark(d=>!d)} className="px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-700">{dark? 'Light' : 'Dark'}</button>
-                <a href="index.html" className="ml-2 px-3 py-1 rounded-md bg-indigo-600 text-white">Stable</a>
+                {user && (
+                  <div className="flex items-center gap-2 ml-2">
+                    <img src={user.photoURL || 'https://via.placeholder.com/32'} alt={user.displayName} className="w-8 h-8 rounded-full" />
+                    <span className="text-sm text-slate-600 dark:text-slate-400 hidden sm:inline">{user.displayName?.split(' ')[0]}</span>
+                    <button onClick={onLogout} className="px-3 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm">Logout</button>
+                  </div>
+                )}
+                <a href="index.html" className="ml-2 px-3 py-1 rounded-md bg-indigo-600 text-white text-sm">Stable</a>
               </div>
             </div>
           </div>
@@ -88,6 +121,40 @@
         d.setDate(1);
         return d;
       });
+
+      // Firebase Auth State
+      const [user, setUser] = useState(null);
+      const [loadingAuth, setLoadingAuth] = useState(true);
+      const [loginError, setLoginError] = useState(null);
+
+      // Listen to Firebase Auth State
+      useEffect(()=>{
+        if(!window.firebaseAuth) return;
+        const unsubscribe = window.firebaseAuth.onAuthStateChanged(window.firebaseAuth.auth, (currentUser)=>{
+          setUser(currentUser);
+          setLoadingAuth(false);
+        });
+        return ()=> unsubscribe();
+      }, []);
+
+      // Firebase Methods
+      const handleGoogleLogin = async()=>{
+        try{
+          setLoginError(null);
+          const provider = new window.firebaseAuth.GoogleAuthProvider();
+          await window.firebaseAuth.signInWithPopup(window.firebaseAuth.auth, provider);
+        }catch(err){
+          setLoginError('Google Login fehlgeschlagen: ' + err.message);
+        }
+      };
+
+      const handleLogout = async()=>{
+        try{
+          await window.firebaseAuth.signOut(window.firebaseAuth.auth);
+        }catch(err){
+          console.error('Logout error:', err);
+        }
+      };
 
       useEffect(()=>{ localStorage.setItem('beta_vacations', JSON.stringify(vacations)); }, [vacations]);
       useEffect(()=>{ localStorage.setItem('beta_settings', JSON.stringify(settings)); }, [settings]);
@@ -374,85 +441,138 @@
 
       return (
         <div className="min-h-screen" style={{ '--color-primary': settings.primaryColor, '--color-secondary': settings.secondaryColor, '--color-accent': settings.accentColor }}>
-          <Nav active={active} onChange={setActive} dark={dark} setDark={setDark} />
-          <main className={`max-w-7xl mx-auto ${settings.compactMode ? 'p-4' : 'p-6'}`}>
-            {active === 'Dashboard' && (
-              <>
-                <Dashboard now={now} vacations={vacations} todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
-                <div className="mt-8">
-                  <Calendar todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
-                </div>
-              </>
-            )}
+          {/* Loading State */}
+          {loadingAuth && (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-900">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <p className="text-slate-600 dark:text-slate-400">Schultracker wird geladen...</p>
+              </div>
+            </div>
+          )}
 
-            {active === 'Kalender' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  <Calendar todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
+          {/* Login Screen */}
+          {!loadingAuth && !user && (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-900 p-4">
+              <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-8">
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 mb-2">Schultracker</h1>
+                  <p className="text-slate-600 dark:text-slate-400">Beta Version</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">Melde dich mit deinem Google-Konto an</p>
                 </div>
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover">
-                  <h3 className="font-semibold mb-4">📋 Alle Todos ({todos.length})</h3>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {todos.length === 0 ? (
-                      <p className="text-sm text-slate-500">Keine Todos. Füge im Kalender welche hinzu!</p>
-                    ) : (
-                      todos.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded">
-                          <input type="checkbox" checked={t.done} onChange={()=> setTodos(d => d.map(x => x.id===t.id ? {...x, done: !x.done} : x))} className="w-4 h-4 accent-indigo-600" />
-                          <span className={`text-sm flex-1 ${t.done ? 'line-through text-slate-400' : ''}`}>{t.title}</span>
-                          <span className="text-xs text-slate-400">{t.date}</span>
-                        </div>
-                      ))
-                    )}
+
+                {loginError && (
+                  <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm text-red-700 dark:text-red-300">{loginError}</p>
                   </div>
+                )}
+
+                <button 
+                  onClick={handleGoogleLogin}
+                  className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors font-medium text-slate-800 dark:text-white shadow-md"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Mit Google anmelden
+                </button>
+
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    🔒 Deine Daten werden sicher in Firebase gespeichert und synchronisiert.
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {active === 'Stundenplan' && (
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-xl font-bold">📅 Stundenplan</h2>
-                <p className="text-sm text-slate-500 mt-2">Neue Stundenplan-Ansicht wird bald implementiert.</p>
-                <div className="mt-4 grid grid-cols-5 gap-3">
-                  {['Mo','Di','Mi','Do','Fr'].map(day => (
-                    <div key={day} className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-center">
-                      <div className="font-semibold text-indigo-700 dark:text-indigo-300">{day}</div>
-                      <div className="text-sm text-slate-600 mt-2">Coming Soon</div>
+          {/* Main App */}
+          {!loadingAuth && user && (
+            <>
+              <Nav active={active} onChange={setActive} dark={dark} setDark={setDark} user={user} onLogout={handleLogout} />
+              <main className={`max-w-7xl mx-auto ${settings.compactMode ? 'p-4' : 'p-6'}`}>
+                {active === 'Dashboard' && (
+                  <>
+                    <Dashboard now={now} vacations={vacations} todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
+                    <div className="mt-8">
+                      <Calendar todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </>
+                )}
 
-            {active === 'Experimente' && (
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-xl font-bold">🔬 Experimente</h2>
-                <p className="text-sm text-slate-500 mt-2">Hier kannst du neue Features testen!</p>
-                <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">💡 Diese Section enthält noch kaum Features. Überprüfe die Experimentelle Settings!</p>
-                </div>
-              </div>
-            )}
-
-            {active === 'Einstellungen' && (
-              <div>
-                <h2 className="text-2xl font-bold mb-2">⚙️ Einstellungen</h2>
-                <p className="text-sm text-slate-500 mb-6">Personalisiere deine Schultracker Beta nach deinem Geschmack.</p>
-                <FeatureToggles settings={settings} setSettings={setSettings} />
-                
-                <div className="mt-6 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                  <h3 className="font-semibold mb-4">💾 Daten</h3>
-                  <div className="flex flex-col gap-3">
-                    <button onClick={handleExport} className="px-4 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">📥 Alle Daten exportieren</button>
-                    <label className="block">
-                      <span className="text-sm text-slate-500 block mb-2">📤 Datei importieren (JSON):</span>
-                      <input type="file" accept="application/json" onChange={handleImport} className="p-2 border border-slate-300 dark:border-slate-600 rounded-lg w-full dark:bg-slate-700" />
-                    </label>
+                {active === 'Kalender' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      <Calendar todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover">
+                      <h3 className="font-semibold mb-4">📋 Alle Todos ({todos.length})</h3>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {todos.length === 0 ? (
+                          <p className="text-sm text-slate-500">Keine Todos. Füge im Kalender welche hinzu!</p>
+                        ) : (
+                          todos.map(t => (
+                            <div key={t.id} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded">
+                              <input type="checkbox" checked={t.done} onChange={()=> setTodos(d => d.map(x => x.id===t.id ? {...x, done: !x.done} : x))} className="w-4 h-4 accent-indigo-600" />
+                              <span className={`text-sm flex-1 ${t.done ? 'line-through text-slate-400' : ''}`}>{t.title}</span>
+                              <span className="text-xs text-slate-400">{t.date}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
-          </main>
+                )}
+
+                {active === 'Stundenplan' && (
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
+                    <h2 className="text-xl font-bold">📅 Stundenplan</h2>
+                    <p className="text-sm text-slate-500 mt-2">Neue Stundenplan-Ansicht wird bald implementiert.</p>
+                    <div className="mt-4 grid grid-cols-5 gap-3">
+                      {['Mo','Di','Mi','Do','Fr'].map(day => (
+                        <div key={day} className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-center">
+                          <div className="font-semibold text-indigo-700 dark:text-indigo-300">{day}</div>
+                          <div className="text-sm text-slate-600 mt-2">Coming Soon</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {active === 'Experimente' && (
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
+                    <h2 className="text-xl font-bold">🔬 Experimente</h2>
+                    <p className="text-sm text-slate-500 mt-2">Hier kannst du neue Features testen!</p>
+                    <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">💡 Diese Section enthält noch kaum Features. Überprüfe die Experimentelle Settings!</p>
+                    </div>
+                  </div>
+                )}
+
+                {active === 'Einstellungen' && (
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2">⚙️ Einstellungen</h2>
+                    <p className="text-sm text-slate-500 mb-6">Personalisiere deine Schultracker Beta nach deinem Geschmack.</p>
+                    <FeatureToggles settings={settings} setSettings={setSettings} />
+                    
+                    <div className="mt-6 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
+                      <h3 className="font-semibold mb-4">💾 Daten</h3>
+                      <div className="flex flex-col gap-3">
+                        <button onClick={handleExport} className="px-4 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">📥 Alle Daten exportieren</button>
+                        <label className="block">
+                          <span className="text-sm text-slate-500 block mb-2">📤 Datei importieren (JSON):</span>
+                          <input type="file" accept="application/json" onChange={handleImport} className="p-2 border border-slate-300 dark:border-slate-600 rounded-lg w-full dark:bg-slate-700" />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </main>
+            </>
+          )}
         </div>
       )
     }
