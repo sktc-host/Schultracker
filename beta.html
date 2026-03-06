@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Beta — Schultracker</title>
+  <title>Schultracker — Neue Version</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -38,7 +38,7 @@
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16 items-center">
               <div className="flex items-center gap-4">
-                <div className="text-indigo-600 font-extrabold text-lg">Schultracker Beta</div>
+                <div className="text-indigo-600 font-extrabold text-lg">Schultracker</div>
                 <nav className="hidden md:flex gap-2">
                   {['Dashboard','Kalender','Stundenplan','Experimente','Einstellungen'].map(item=> (
                     <button key={item} onClick={()=>onChange(item)} className={`px-3 py-1 rounded-md font-medium ${active===item? 'bg-indigo-100 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
@@ -48,7 +48,6 @@
                 </nav>
               </div>
               <div className="flex items-center gap-3">
-                <div className="text-sm text-slate-500 hidden sm:block">Live (13s voreingestellt)</div>
                 <button onClick={()=>setDark(d=>!d)} className="px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-700">{dark? 'Light' : 'Dark'}</button>
                 <a href="index.html" className="ml-2 px-3 py-1 rounded-md bg-indigo-600 text-white">Stable</a>
               </div>
@@ -59,12 +58,29 @@
     }
 
     function Dashboard({now, vacations}){
-      const yearStart = toDateISO('2025-09-14');
-      const yearEnd = toDateISO('2026-07-29');
-      function daysBetween(a,b){ const _a=new Date(a.getFullYear(),a.getMonth(),a.getDate()), _b=new Date(b.getFullYear(),b.getMonth(),b.getDate()); return Math.round((+_b - +_a)/(1000*60*60*24)); }
-      const total = daysBetween(yearStart, yearEnd);
-      const passed = daysBetween(yearStart, now);
-      const percent = Math.max(0, Math.min(100, Math.round((passed/total)*100)));
+      // School-day aware calculation (like stable version)
+      const DEFAULT_PUBLIC_HOLIDAYS = [
+        "2025-10-03","2025-11-01","2025-12-25","2025-12-26","2026-01-01","2026-01-06",
+        "2026-04-03","2026-04-06","2026-05-01","2026-05-14","2026-05-25","2026-06-04","2026-07-10"
+      ];
+      const DEFAULT_WEEKLY_HOURS = { monday: 9, tuesday: 6, wednesday: 6, thursday: 9, friday: 5, saturday: 0, sunday: 0 };
+
+      function dateAddDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
+      function iterateDates(from,to){ const arr=[]; let cur = new Date(from); while(cur <= to){ arr.push(new Date(cur)); cur = dateAddDays(cur,1); } return arr; }
+      function toDateISOLocal(s){ if(!s) return null; const d = new Date(s + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+      const parsedVacations = useMemo(()=>{ const out = {}; Object.entries(vacations).forEach(([k,v])=>{ if(!v || !v.from) return (out[k]=null); out[k] = { from: toDateISOLocal(v.from), to: toDateISOLocal(v.to) }; }); return out; }, [vacations]);
+      const parsedPublicHolidays = useMemo(()=> new Set(DEFAULT_PUBLIC_HOLIDAYS.map(d=> toDateISOLocal(d).toDateString() )), []);
+
+      const schoolStart = toDateISOLocal('2025-09-14');
+      const schoolEnd = toDateISOLocal('2026-07-29');
+
+      function isSchoolDay(d){ const day = d.getDay(); if(day ===0 || day ===6) return false; if(parsedPublicHolidays.has(d.toDateString())) return false; for(const v of Object.values(parsedVacations)){ if(!v) continue; if(d >= v.from && d <= v.to) return false; } if(d < schoolStart || d > schoolEnd) return false; return true; }
+
+      const days = iterateDates(schoolStart, schoolEnd);
+      const total = days.reduce((acc,d) => acc + (isSchoolDay(d) ? 1 : 0), 0);
+      const passed = iterateDates(schoolStart, now).reduce((acc,d) => acc + (isSchoolDay(d) && d <= now ? 1 : 0), 0);
+      const percent = total ? Math.max(0, Math.min(100, Math.round((passed/total)*100))) : 0;
       return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
           <div className="col-span-2 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow">
@@ -83,7 +99,7 @@
               <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
                 <div className="h-3 bg-indigo-500 rounded-full" style={{ width: `${percent}%` }}></div>
               </div>
-              <div className="mt-2 text-sm text-slate-600">{percent}% abgeschlossen ({passed} / {total} Tage)</div>
+              <div className="mt-2 text-sm text-slate-600">{percent}% abgeschlossen ({passed} von {total} Schultagen)</div>
             </div>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -109,7 +125,7 @@
           <aside className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow">
             <h3 className="font-semibold text-slate-800 dark:text-slate-200">Schnellaktionen</h3>
             <div className="mt-4 flex flex-col gap-3">
-              <button id="export" className="px-4 py-2 rounded-md bg-indigo-600 text-white">Exportiere Beta‑Einstellungen</button>
+                <button id="export" className="px-4 py-2 rounded-md bg-indigo-600 text-white">Exportiere Einstellungen</button>
               <label className="block text-sm text-slate-500">Import (JSON)</label>
               <input id="import" type="file" accept="application/json" className="p-2 border rounded" />
             </div>
@@ -143,7 +159,7 @@
     function CalendarMock({vacations}){
       return (
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow mt-6">
-          <h3 className="font-semibold">Kalender (Beta‑Vorschau)</h3>
+          <h3 className="font-semibold">Kalender (Vorschau)</h3>
           <div className="mt-4 grid gap-3">
             {Object.entries(vacations).map(([k,v])=> (
               <div key={k} className="flex items-center justify-between">
@@ -164,24 +180,157 @@
       const [dark, setDark] = useState(() => JSON.parse(localStorage.getItem('beta_dark') || 'false'));
       const [vacations, setVacations] = useState(() => JSON.parse(localStorage.getItem('beta_vacations') || JSON.stringify(DEFAULT_VACATIONS)));
       const [settings, setSettings] = useState(() => JSON.parse(localStorage.getItem('beta_settings') || JSON.stringify({ timeSimulator:false, autoAlerts:false, newDesign:true })));
+      const [todos, setTodos] = useState(() => JSON.parse(localStorage.getItem('beta_todos') || '[]'));
 
       useEffect(()=>{ localStorage.setItem('beta_vacations', JSON.stringify(vacations)); }, [vacations]);
       useEffect(()=>{ localStorage.setItem('beta_settings', JSON.stringify(settings)); }, [settings]);
       useEffect(()=>{ localStorage.setItem('beta_dark', JSON.stringify(dark)); if(dark) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); }, [dark]);
+      useEffect(()=>{ localStorage.setItem('beta_todos', JSON.stringify(todos)); }, [todos]);
 
       // use a 13s offset like the main app
       const now = useNow(1000, 13*1000);
 
-      // export/import handlers
+      // Export/import remains available but moved to settings
       useEffect(()=>{
         const exBtn = document.getElementById('export');
         const imp = document.getElementById('import');
-        function doExport(){ const payload = { vacations, settings, dark }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'schultracker-beta-export.json'; a.click(); URL.revokeObjectURL(url); }
-        function doImport(e){ const f = e.target.files && e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = () => { try{ const data = JSON.parse(r.result); if(data.vacations) setVacations(data.vacations); if(data.settings) setSettings(data.settings); if(typeof data.dark === 'boolean') setDark(data.dark); alert('Import erfolgreich'); }catch(err){ alert('Ungültige Datei'); } }; r.readAsText(f); }
+        function doExport(){ const payload = { vacations, settings, dark, todos }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'schultracker-export.json'; a.click(); URL.revokeObjectURL(url); }
+        function doImport(e){ const f = e.target.files && e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = () => { try{ const data = JSON.parse(r.result); if(data.vacations) setVacations(data.vacations); if(data.settings) setSettings(data.settings); if(typeof data.dark === 'boolean') setDark(data.dark); if(Array.isArray(data.todos)) setTodos(data.todos); alert('Import erfolgreich'); }catch(err){ alert('Ungültige Datei'); } }; r.readAsText(f); }
         exBtn && exBtn.addEventListener('click', doExport);
         imp && imp.addEventListener('change', doImport);
         return ()=>{ exBtn && exBtn.removeEventListener('click', doExport); imp && imp.removeEventListener('change', doImport); }
-      }, [vacations, settings, dark]);
+      }, [vacations, settings, dark, todos]);
+
+      // Simple calendar component nested for scope
+      function Calendar({todos, setTodos}){
+        const [viewDate, setViewDate] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+        const [selectedDate, setSelectedDate] = useState(null);
+
+        function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+        function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
+
+        const start = startOfMonth(viewDate);
+        const end = endOfMonth(viewDate);
+        const startWeekday = (start.getDay()+6)%7; // Monday=0
+
+        const days = [];
+        for(let i=0;i<startWeekday;i++) days.push(null);
+        for(let d=1; d<=end.getDate(); d++) days.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), d));
+
+        function nextMonth(){ setViewDate(d => new Date(d.getFullYear(), d.getMonth()+1, 1)); }
+        function prevMonth(){ setViewDate(d => new Date(d.getFullYear(), d.getMonth()-1, 1)); }
+
+        function todosForDate(day){ if(!day) return []; const key = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString().slice(0,10); return todos.filter(t => t.date === key); }
+
+        function addTodoForDate(day, title){ if(!title) return; const key = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString().slice(0,10); const item = { id: Date.now(), title, date: key, done: false }; setTodos(t => [item, ...t]); }
+
+        function toggleDone(id){ setTodos(t => t.map(x => x.id===id? {...x, done: !x.done} : x)); }
+        function removeTodo(id){ setTodos(t => t.filter(x => x.id!==id)); }
+
+        return (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow mt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Kalender</h3>
+                <div className="text-sm text-slate-500">{viewDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' })}</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={prevMonth} className="px-3 py-1 bg-slate-100 rounded">Zurück</button>
+                <button onClick={nextMonth} className="px-3 py-1 bg-slate-100 rounded">Nächster</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 mt-4 text-xs">
+              {['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=> <div key={d} className="text-center font-medium text-slate-600">{d}</div>)}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 mt-2">
+              {days.map((day, idx) => (
+                <div key={idx} className={`min-h-[80px] p-2 border rounded ${day? 'bg-white dark:bg-slate-700' : 'bg-transparent'}`}>
+                  {day ? (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{day.getDate()}</div>
+                        <button onClick={()=> setSelectedDate(day)} className="text-xs text-indigo-600">Neu</button>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs">
+                        {todosForDate(day).slice(0,3).map(t => (
+                          <div key={t.id} className="flex items-center justify-between gap-2">
+                            <div className={`truncate ${t.done? 'line-through text-slate-400' : ''}`}>{t.title}</div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={()=> toggleDone(t.id)} className="text-xs px-1 rounded bg-slate-100">{t.done? '↺' : '✓'}</button>
+                              <button onClick={()=> removeTodo(t.id)} className="text-xs px-1 rounded bg-red-100">✕</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            {selectedDate && (
+              <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700 rounded">
+                <div className="flex items-start gap-2">
+                  <div className="text-sm font-medium">{formatDate(selectedDate)}</div>
+                  <div className="flex-1">
+                    <AddTodoForm defaultDate={selectedDate} onAdd={(title)=>{ addTodoForDate(selectedDate, title); setSelectedDate(null); }} onCancel={()=> setSelectedDate(null)} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      function AddTodoForm({defaultDate, onAdd, onCancel}){
+        const [title, setTitle] = useState('');
+        return (
+          <div className="flex gap-2">
+            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Todo Titel" className="p-2 w-full rounded border" />
+            <div className="flex gap-2">
+              <button onClick={()=> { if(title.trim()) { onAdd(title.trim()); setTitle(''); } }} className="px-3 py-1 bg-indigo-600 text-white rounded">Hinzufügen</button>
+              <button onClick={onCancel} className="px-3 py-1 bg-slate-200 rounded">Abbrechen</button>
+            </div>
+          </div>
+        )
+      }
+
+      function TodoList({todos, setTodos}){
+        const [title, setTitle] = useState('');
+        const [date, setDate] = useState('');
+        function add(){ if(!title.trim()) return; const item = { id: Date.now(), title: title.trim(), date: date || null, done: false }; setTodos(t=> [item, ...t]); setTitle(''); setDate(''); }
+        function toggle(id){ setTodos(t => t.map(x => x.id===id? {...x, done: !x.done} : x)); }
+        function remove(id){ setTodos(t => t.filter(x => x.id!==id)); }
+        return (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow mt-6">
+            <h3 className="font-semibold">To‑Do Liste</h3>
+            <div className="mt-3 grid gap-2">
+              <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Neues Todo" className="p-2 border rounded" />
+              <input value={date} onChange={e=>setDate(e.target.value)} type="date" className="p-2 border rounded" />
+              <div className="flex gap-2">
+                <button onClick={add} className="px-3 py-1 bg-indigo-600 text-white rounded">Hinzufügen</button>
+                <button onClick={()=>{ setTitle(''); setDate(''); }} className="px-3 py-1 bg-slate-200 rounded">Zurücksetzen</button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {todos.map(t=> (
+                  <div key={t.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700 rounded">
+                    <div>
+                      <div className={`${t.done? 'line-through text-slate-400' : ''} font-medium`}>{t.title}</div>
+                      <div className="text-xs text-slate-500">{t.date? t.date : 'Kein Datum'}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={()=> toggle(t.id)} className="px-2 py-1 bg-slate-100 rounded">{t.done? '↺' : '✓'}</button>
+                      <button onClick={()=> remove(t.id)} className="px-2 py-1 bg-red-100 rounded">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      }
 
       return (
         <div className="min-h-screen">
@@ -192,13 +341,13 @@
                 <Dashboard now={now} vacations={vacations} />
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2">
-                    <FeatureToggles settings={settings} setSettings={setSettings} />
-                    <CalendarMock vacations={vacations} />
+                    <Calendar todos={todos} setTodos={setTodos} />
                   </div>
                   <aside>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow">
-                      <h3 className="font-semibold">Beta‑Notizen</h3>
+                      <h3 className="font-semibold">Notizen</h3>
                       <BetaNotes />
+                      <TodoList todos={todos} setTodos={setTodos} />
                     </div>
                   </aside>
                 </div>
@@ -207,8 +356,8 @@
 
             {active === 'Kalender' && (
               <div className="mt-6">
-                <h2 className="text-xl font-bold">Kalender (Demo)</h2>
-                <p className="text-sm text-slate-500">Interaktive Kalenderansicht folgt — Beta Showcase</p>
+                <Calendar todos={todos} setTodos={setTodos} />
+                <TodoList todos={todos} setTodos={setTodos} />
               </div>
             )}
 
@@ -229,7 +378,15 @@
             {active === 'Einstellungen' && (
               <div className="mt-6">
                 <h2 className="text-xl font-bold">Einstellungen</h2>
-                <p className="text-sm text-slate-500">Beta Einstellungen werden separat gespeichert und beeinflussen die Stable‑Version nicht.</p>
+                <p className="text-sm text-slate-500">Einstellungen werden separat gespeichert und beeinflussen die Stable‑Version nicht.</p>
+                <FeatureToggles settings={settings} setSettings={setSettings} />
+                <div className="mt-4">
+                  <h3 className="font-semibold">Export / Import</h3>
+                  <div className="mt-2 flex items-center gap-3">
+                    <button id="export" className="px-4 py-2 rounded bg-indigo-600 text-white">Exportieren</button>
+                    <input id="import" type="file" accept="application/json" className="p-2" />
+                  </div>
+                </div>
               </div>
             )}
           </main>
