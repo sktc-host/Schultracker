@@ -122,15 +122,6 @@
             </div>
           </div>
 
-          <aside className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200">Schnellaktionen</h3>
-            <div className="mt-4 flex flex-col gap-3">
-                <button id="export" className="px-4 py-2 rounded-md bg-indigo-600 text-white">Exportiere Einstellungen</button>
-              <label className="block text-sm text-slate-500">Import (JSON)</label>
-              <input id="import" type="file" accept="application/json" className="p-2 border rounded" />
-            </div>
-          </aside>
-        </div>
       )
     }
 
@@ -190,16 +181,8 @@
       // use a 13s offset like the main app
       const now = useNow(1000, 13*1000);
 
-      // Export/import remains available but moved to settings
-      useEffect(()=>{
-        const exBtn = document.getElementById('export');
-        const imp = document.getElementById('import');
-        function doExport(){ const payload = { vacations, settings, dark, todos }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'schultracker-export.json'; a.click(); URL.revokeObjectURL(url); }
-        function doImport(e){ const f = e.target.files && e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = () => { try{ const data = JSON.parse(r.result); if(data.vacations) setVacations(data.vacations); if(data.settings) setSettings(data.settings); if(typeof data.dark === 'boolean') setDark(data.dark); if(Array.isArray(data.todos)) setTodos(data.todos); alert('Import erfolgreich'); }catch(err){ alert('Ungültige Datei'); } }; r.readAsText(f); }
-        exBtn && exBtn.addEventListener('click', doExport);
-        imp && imp.addEventListener('change', doImport);
-        return ()=>{ exBtn && exBtn.removeEventListener('click', doExport); imp && imp.removeEventListener('change', doImport); }
-      }, [vacations, settings, dark, todos]);
+      function handleExport(){ const payload = { vacations, settings, dark, todos }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'schultracker-export.json'; a.click(); URL.revokeObjectURL(url); }
+      function handleImport(e){ const f = e.target.files && e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = () => { try{ const data = JSON.parse(r.result); if(data.vacations) setVacations(data.vacations); if(data.settings) setSettings(data.settings); if(typeof data.dark === 'boolean') setDark(data.dark); if(Array.isArray(data.todos)) setTodos(data.todos); alert('Import erfolgreich'); }catch(err){ alert('Ungültige Datei'); } }; r.readAsText(f); }
 
       // Simple calendar component nested for scope
       function Calendar({todos, setTodos}){
@@ -339,25 +322,23 @@
             {active === 'Dashboard' && (
               <>
                 <Dashboard now={now} vacations={vacations} />
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              </>
+            )}
+
+            {active === 'Kalender' && (
+              <div>
+                <Calendar todos={todos} setTodos={setTodos} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
                   <div className="lg:col-span-2">
-                    <Calendar todos={todos} setTodos={setTodos} />
+                    <TodoList todos={todos} setTodos={setTodos} />
                   </div>
                   <aside>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow">
                       <h3 className="font-semibold">Notizen</h3>
                       <BetaNotes />
-                      <TodoList todos={todos} setTodos={setTodos} />
                     </div>
                   </aside>
                 </div>
-              </>
-            )}
-
-            {active === 'Kalender' && (
-              <div className="mt-6">
-                <Calendar todos={todos} setTodos={setTodos} />
-                <TodoList todos={todos} setTodos={setTodos} />
               </div>
             )}
 
@@ -376,15 +357,18 @@
             )}
 
             {active === 'Einstellungen' && (
-              <div className="mt-6">
+              <div>
                 <h2 className="text-xl font-bold">Einstellungen</h2>
-                <p className="text-sm text-slate-500">Einstellungen werden separat gespeichert und beeinflussen die Stable‑Version nicht.</p>
+                <p className="text-sm text-slate-500 mb-6">Einstellungen werden separat gespeichert und beeinflussen die Stable‑Version nicht.</p>
                 <FeatureToggles settings={settings} setSettings={setSettings} />
-                <div className="mt-4">
-                  <h3 className="font-semibold">Export / Import</h3>
-                  <div className="mt-2 flex items-center gap-3">
-                    <button id="export" className="px-4 py-2 rounded bg-indigo-600 text-white">Exportieren</button>
-                    <input id="import" type="file" accept="application/json" className="p-2" />
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow mt-6">
+                  <h3 className="font-semibold mb-4">Daten Backup</h3>
+                  <div className="flex flex-col gap-3">
+                    <button onClick={handleExport} className="px-4 py-2 rounded bg-indigo-600 text-white">Exportieren</button>
+                    <label className="block">
+                      <span className="text-sm text-slate-500 block mb-2">Datei importieren (JSON):</span>
+                      <input type="file" accept="application/json" onChange={handleImport} className="p-2 border rounded w-full" />
+                    </label>
                   </div>
                 </div>
               </div>
