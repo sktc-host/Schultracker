@@ -9,7 +9,7 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>body{font-family:'Inter',sans-serif}</style>
+  <style>body{font-family:'Inter',sans-serif} .mono-time { font-variant-numeric: tabular-nums; }</style>
 </head>
 <body class="bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-900 text-slate-800 dark:text-slate-200 min-h-screen">
   <div id="beta-root" class="min-h-screen"></div>
@@ -27,6 +27,7 @@
     };
 
     function toDateISO(s){ if(!s) return null; const d = new Date(s + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+    function toDateISOLocal(s){ if(!s) return null; const d = new Date(s + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
     function formatDate(d){ if(!d) return '—'; return d.toLocaleDateString('de-DE', { day: '2-digit', month:'2-digit', year:'numeric' }) }
 
@@ -66,7 +67,6 @@
 
       function dateAddDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
       function iterateDates(from,to){ const arr=[]; let cur = new Date(from); while(cur <= to){ arr.push(new Date(cur)); cur = dateAddDays(cur,1); } return arr; }
-      function toDateISOLocal(s){ if(!s) return null; const d = new Date(s + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
       const parsedVacations = useMemo(()=>{ const out = {}; Object.entries(vacations).forEach(([k,v])=>{ if(!v || !v.from) return (out[k]=null); out[k] = { from: toDateISOLocal(v.from), to: toDateISOLocal(v.to) }; }); return out; }, [vacations]);
       const parsedPublicHolidays = useMemo(()=> new Set(DEFAULT_PUBLIC_HOLIDAYS.map(d=> toDateISOLocal(d).toDateString() )), []);
@@ -151,15 +151,19 @@
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow mt-6">
           <h3 className="font-semibold">Kalender (Vorschau)</h3>
           <div className="mt-4 grid gap-3">
-            {Object.entries(vacations).map(([k,v])=> (
+            {Object.entries(vacations).map(([k,v])=> {
+              const fromDate = toDateISO(v.from);
+              const toDate = toDateISO(v.to);
+              const duration = fromDate && toDate ? Math.round((toDate - fromDate) / (1000*60*60*24)) : 0;
+              return (
               <div key={k} className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">{k}</div>
-                  <div className="text-xs text-slate-500">{formatDate(toDateISO(v.from))} – {formatDate(toDateISO(v.to))}</div>
+                  <div className="text-xs text-slate-500">{formatDate(fromDate)} – {formatDate(toDate)}</div>
                 </div>
-                <div className="text-sm text-slate-600">Dauer: {Math.max(0, Math.round((toDateISO(v.to)-toDateISO(v.from))/(1000*60*60*24))) } Tage</div>
+                <div className="text-sm text-slate-600">Dauer: {Math.max(0, duration)} Tage</div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )
