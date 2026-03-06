@@ -133,8 +133,8 @@
             useEffect(()=>{ localStorage.setItem('users', JSON.stringify(users)); }, [users]);
             useEffect(()=>{ if(loggedInUser) localStorage.setItem('logged_user', loggedInUser); else localStorage.removeItem('logged_user'); }, [loggedInUser]);
 
-            // adjusted clock (10s ahead)
-            const adjustedNow = useMemo(()=> new Date(today.getTime() + 10*1000), [today]);
+            // adjusted clock (13s ahead)
+            const adjustedNow = useMemo(()=> new Date(today.getTime() + 13*1000), [today]);
 
             // parsed data
             const parsedVacations = useMemo(()=>{ const out = {}; Object.entries(vacations).forEach(([k,v])=>{ if(!v || !v.from) return (out[k]=null); out[k] = { from: toDateISO(v.from), to: toDateISO(v.to) }; }); return out; }, [vacations]);
