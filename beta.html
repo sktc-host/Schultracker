@@ -178,6 +178,7 @@
       function Calendar({todos, setTodos, viewDate, setViewDate}){
         const [inputTitle, setInputTitle] = useState('');
         const [selectedDate, setSelectedDate] = useState(null);
+        const inputRef = React.useRef(null);
 
         function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
         function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
@@ -201,16 +202,23 @@
         function todosForDate(day){ if(!day) return []; const key = dateKey(day); return todos.filter(t => t.date === key); }
 
         function addTodo(day){ 
-          if(!inputTitle.trim()) return; 
+          if(!inputTitle || !inputTitle.trim()) { alert('Bitte gib einen Todo-Text ein'); return; }
           const key = dateKey(day); 
           const item = { id: Date.now(), title: inputTitle.trim(), date: key, done: false }; 
-          setTodos(t => [item, ...t]); 
+          setTodos(t => [...t, item]); 
           setInputTitle(''); 
-          setSelectedDate(null);
+          if(inputRef.current) inputRef.current.focus();
         }
 
         function toggleDone(id){ setTodos(t => t.map(x => x.id===id? {...x, done: !x.done} : x)); }
         function removeTodo(id){ setTodos(t => t.filter(x => x.id!==id)); }
+
+        // Auto-focus input when date is selected
+        useEffect(() => {
+          if (selectedDate && inputRef.current) {
+            setTimeout(() => inputRef.current.focus(), 0);
+          }
+        }, [selectedDate]);
 
         return (
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover mt-6">
