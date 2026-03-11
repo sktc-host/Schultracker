@@ -9,15 +9,15 @@
   "scope": "/Schultracker/",
   "icons": [
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiIHJ4PSI0MCIgZmlsbD0iIzRmNDZlNSIvPjx0ZXh0IHg9Ijk2IiB5PSIxMDgiIGZvbnQtc2l6ZT0iNzIiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgZm9udC1mYW1pbHk9IkludGVyLCBzeXN0ZW0tdWkiPlNLPC90ZXh0Pjwvc3ZnPg==",
+      "src": "https://raw.githubusercontent.com/sktc-host/Schultracker/main/applogo.jpeg",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSIxMDAiIGZpbGw9IiM0ZjQ2ZTUiLz48dGV4dCB4PSIyNTYiIHk9IjI4MCIgZm9udC1zaXplPSIxODAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgZm9udC1mYW1pbHk9IkludGVyLCBzeXN0ZW0tdWkiPlNLPC90ZXh0Pjwvc3ZnPg==",
+      "src": "https://raw.githubusercontent.com/sktc-host/Schultracker/main/applogo.jpeg",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ]
