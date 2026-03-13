@@ -27,7 +27,7 @@ function formatDate(d) {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function useNow(interval = 1000, offsetMs = 0) {
+function useNow(interval = 10000, offsetMs = 0) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), interval);
@@ -36,501 +36,13 @@ function useNow(interval = 1000, offsetMs = 0) {
   return useMemo(() => new Date(now.getTime() + offsetMs), [now, offsetMs]);
 }
 
-function Nav({ active, onChange, dark, setDark, user, onLogout }) {
-  return (
-    <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center gap-4">
-            <div className="text-indigo-600 font-extrabold text-lg">Schultracker</div>
-            <nav className="hidden md:flex gap-2">
-              {['Dashboard', 'Kalender', 'Stundenplan', 'Experimente', 'Einstellungen'].map(item => (
-                <button
-                  key={item}
-                  onClick={() => onChange(item)}
-                  className={`px-3 py-1 rounded-md font-medium ${active === item
-                    ? 'bg-indigo-100 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setDark(d => !d)} className="px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-700">
-              {dark ? 'Light' : 'Dark'}
-            </button>
-            {user && (
-              <div className="flex items-center gap-2 ml-2">
-                <img src={user.photoURL || 'https://via.placeholder.com/32'} alt={user.displayName} className="w-8 h-8 rounded-full" />
-                <span className="text-sm text-slate-600 dark:text-slate-400 hidden sm:inline">{user.displayName?.split(' ')[0]}</span>
-                <button onClick={onLogout} className="px-3 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm">
-                  Logout
-                </button>
-              </div>
-            )}
-            <a href="index.html" className="ml-2 px-3 py-1 rounded-md bg-indigo-600 text-white text-sm">Stable</a>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
+// The Nav component has been extracted to Schultracker/components/Nav.js
 
-function Calendar({ todos, setTodos, viewDate, setViewDate }) {
-  const [inputTitle, setInputTitle] = useState('');
-  const [selectedDateKey, setSelectedDateKey] = useState(null);
-  const inputRef = React.useRef(null);
+// The Calendar component has been extracted to Schultracker/components/Calendar.js
 
-  function startOfMonth(d) {
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  }
+// The Dashboard component has been extracted to Schultracker/components/Dashboard.js
 
-  function endOfMonth(d) {
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  }
-
-  const start = startOfMonth(viewDate);
-  const end = endOfMonth(viewDate);
-  const startWeekday = start.getDay();
-
-  const days = [];
-  for (let i = 0; i < startWeekday; i++) days.push(null);
-  for (let d = 1; d <= end.getDate(); d++) days.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), d));
-
-  function nextMonth() {
-    setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
-  }
-
-  function prevMonth() {
-    setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-  }
-
-  function dateKey(d) {
-    if (!d) return null;
-    return d.toISOString().split('T')[0];
-  }
-
-  function todosForDate(key) {
-    if (!key) return [];
-    return todos.filter(t => t.date === key);
-  }
-
-  function selectDate(day) {
-    if (!day) return;
-    const key = dateKey(day);
-    setSelectedDateKey(key);
-    setInputTitle('');
-    setTimeout(() => {
-      if (inputRef.current) inputRef.current.focus();
-    }, 50);
-  }
-
-  function closeDialog() {
-    setSelectedDateKey(null);
-    setInputTitle('');
-  }
-
-  function addTodo() {
-    if (!inputTitle.trim() || !selectedDateKey) return;
-    const newTodo = { id: Date.now(), title: inputTitle.trim(), date: selectedDateKey, done: false };
-    setTodos(t => [...t, newTodo]);
-    setInputTitle('');
-    if (inputRef.current) inputRef.current.focus();
-  }
-
-  function toggleDone(id) {
-    setTodos(t => t.map(x => x.id === id ? { ...x, done: !x.done } : x));
-  }
-
-  function removeTodo(id) {
-    setTodos(t => t.filter(x => x.id !== id));
-  }
-
-  const todayKey = new Date().toISOString().split('T')[0];
-
-  return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover mt-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-semibold">Kalender</h3>
-          <div className="text-sm text-slate-500">{viewDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' })}</div>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={prevMonth} className="btn-simple px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">
-            ←
-          </button>
-          <button onClick={nextMonth} className="btn-simple px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">
-            →
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-7 gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-        {['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'].map(d => (
-          <div key={d} className="text-center">{d}</div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 gap-2">
-        {days.map((day, idx) => {
-          const key = day ? dateKey(day) : null;
-          const isToday = key === todayKey;
-          const dayTodos = todosForDate(key);
-          const isSelected = selectedDateKey === key;
-
-          return (
-            <div
-              key={idx}
-              className={`day-cell min-h-[100px] p-3 rounded-lg border-2 cursor-pointer transition ${day
-                ? isSelected
-                  ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-500'
-                  : 'bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 hover:border-indigo-400'
-                : 'bg-transparent border-transparent pointer-events-none'
-                }`}
-              onClick={() => { if (day) selectDate(day); }}
-            >
-              {day && (
-                <div className="h-full flex flex-col">
-                  <div className={`font-semibold text-sm ${isToday
-                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 w-6 h-6 flex items-center justify-center rounded-full'
-                    : 'text-slate-800 dark:text-slate-200'
-                    }`}>
-                    {day.getDate()}
-                  </div>
-                  <div className="mt-2 flex-1 space-y-1 text-xs">
-                    {dayTodos.slice(0, 2).map(t => (
-                      <div
-                        key={t.id}
-                        className={`px-2 py-1 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 truncate pointer-events-none ${t.done ? 'line-through opacity-50' : ''}`}
-                      >
-                        {t.title}
-                      </div>
-                    ))}
-                    {dayTodos.length > 2 && (
-                      <div className="text-xs text-slate-500 pointer-events-none">+{dayTodos.length - 2}</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {selectedDateKey && (
-        <div className="mt-6 p-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border-2 border-indigo-300 dark:border-indigo-600">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-base font-bold text-indigo-900 dark:text-indigo-100">
-              {new Date(selectedDateKey + 'T00:00:00').toLocaleDateString('de-DE', {
-                weekday: 'short',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-              })}
-            </h4>
-            <button onClick={closeDialog} className="btn-simple text-xl text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
-              ✕
-            </button>
-          </div>
-
-          <div className="flex gap-2 mb-4">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputTitle}
-              onChange={e => setInputTitle(e.target.value)}
-              placeholder="Todo eingeben..."
-              className="flex-1 px-3 py-2 border-2 border-indigo-200 dark:border-indigo-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && inputTitle.trim()) {
-                  e.preventDefault();
-                  addTodo();
-                }
-              }}
-            />
-            <button
-              onClick={addTodo}
-              disabled={!inputTitle.trim()}
-              className="btn-simple px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold"
-            >
-              +
-            </button>
-          </div>
-
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {todosForDate(selectedDateKey).length === 0 ? (
-              <p className="text-sm text-indigo-600 dark:text-indigo-300 italic">Noch keine Todos für diesen Tag</p>
-            ) : (
-              <>
-                <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-2">
-                  Todos ({todosForDate(selectedDateKey).length})
-                </p>
-                {todosForDate(selectedDateKey).map(t => (
-                  <div key={t.id} className="btn-simple flex items-center gap-3 p-2 bg-white dark:bg-slate-700/50 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">
-                    <button
-                      onClick={() => toggleDone(t.id)}
-                      className={`w-6 h-6 rounded border-2 flex items-center justify-center text-sm flex-shrink-0 btn-simple ${t.done
-                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                        : 'border-slate-300 dark:border-slate-500 hover:border-emerald-500'
-                        }`}
-                    >
-                      {t.done && '✓'}
-                    </button>
-                    <span className={`flex-1 text-sm ${t.done ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>
-                      {t.title}
-                    </span>
-                    <button
-                      onClick={() => removeTodo(t.id)}
-                      className="btn-simple text-red-500 hover:text-red-700 dark:hover:text-red-400 text-sm px-2 py-1 rounded"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Dashboard({ now, vacations, todos, setTodos, viewDate, setViewDate }) {
-  const DEFAULT_PUBLIC_HOLIDAYS = [
-    "2025-10-03", "2025-11-01", "2025-12-25", "2025-12-26", "2026-01-01", "2026-01-06",
-    "2026-04-03", "2026-04-06", "2026-05-01", "2026-05-14", "2026-05-25", "2026-06-04", "2026-07-10"
-  ];
-
-  function dateAddDays(d, n) {
-    const x = new Date(d);
-    x.setDate(x.getDate() + n);
-    return new Date(x.getFullYear(), x.getMonth(), x.getDate());
-  }
-
-  function iterateDates(from, to) {
-    const arr = [];
-    let cur = new Date(from);
-    while (cur <= to) {
-      arr.push(new Date(cur));
-      cur = dateAddDays(cur, 1);
-    }
-    return arr;
-  }
-
-  const parsedVacations = useMemo(() => {
-    const out = {};
-    Object.entries(vacations).forEach(([k, v]) => {
-      if (!v || !v.from) return (out[k] = null);
-      out[k] = { from: toDateISOLocal(v.from), to: toDateISOLocal(v.to) };
-    });
-    return out;
-  }, [vacations]);
-
-  const parsedPublicHolidays = useMemo(() => new Set(DEFAULT_PUBLIC_HOLIDAYS.map(d => toDateISOLocal(d).toDateString())), []);
-
-  const schoolStart = toDateISOLocal('2025-09-14');
-  const schoolEnd = toDateISOLocal('2026-07-29');
-
-  function isSchoolDay(d) {
-    const day = d.getDay();
-    if (day === 0 || day === 6) return false;
-    if (parsedPublicHolidays.has(d.toDateString())) return false;
-    for (const v of Object.values(parsedVacations)) {
-      if (!v) continue;
-      if (d >= v.from && d <= v.to) return false;
-    }
-    if (d < schoolStart || d > schoolEnd) return false;
-    return true;
-  }
-
-  const days = iterateDates(schoolStart, schoolEnd);
-  const total = days.reduce((acc, d) => acc + (isSchoolDay(d) ? 1 : 0), 0);
-  const passed = iterateDates(schoolStart, now).reduce((acc, d) => acc + (isSchoolDay(d) && d <= now ? 1 : 0), 0);
-  const percent = total ? Math.max(0, Math.min(100, Math.round((passed / total) * 100))) : 0;
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayTodos = todos.filter(t => t.date === todayStr);
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-      <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-purple-600 dark:from-indigo-900 dark:to-purple-900 rounded-3xl p-8 shadow-xl text-white card-hover">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">Schuljahr Fortschritt</h2>
-            <p className="text-indigo-100 text-sm mt-1">Salvatorkolleg 2025/2026</p>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold mono-time">{now.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin' })}</div>
-            <div className="text-xs text-indigo-200">{formatDate(now)}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
-            <div className="text-3xl font-bold">{passed}</div>
-            <div className="text-xs text-indigo-100 mt-1">Schultage vorbei</div>
-          </div>
-          <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
-            <div className="text-3xl font-bold">{total - passed}</div>
-            <div className="text-xs text-indigo-100 mt-1">Schultage übrig</div>
-          </div>
-          <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
-            <div className="text-3xl font-bold">{percent}%</div>
-            <div className="text-xs text-indigo-100 mt-1">Abgeschlossen</div>
-          </div>
-        </div>
-
-        <div className="w-full bg-white/20 rounded-full h-4 overflow-hidden backdrop-blur-sm">
-          <div className="h-4 bg-emerald-400 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
-        </div>
-        <div className="mt-3 text-sm text-indigo-100">Noch {total - passed} Schultage bis Sommer!</div>
-      </div>
-
-      <div className="space-y-6">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover">
-          <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4">Nächste Ferien</h3>
-          <div className="space-y-3">
-            {Object.entries(vacations).slice(0, 3).map(([k, v]) => (
-              <div key={k} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border-l-4 border-indigo-500">
-                <div className="font-medium text-sm text-slate-800 dark:text-slate-200">{k}</div>
-                <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                  {formatDate(toDateISO(v.from))} - {formatDate(toDateISO(v.to))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover">
-          <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4">📋 Heute ({todayTodos.length})</h3>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {todayTodos.length === 0 ? (
-              <p className="text-sm text-slate-500">Keine Todos für heute</p>
-            ) : (
-              todayTodos.map(t => (
-                <div key={t.id} className="btn-simple flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                  <button
-                    onClick={() => setTodos(d => d.map(x => x.id === t.id ? { ...x, done: !x.done } : x))}
-                    className={`w-4 h-4 rounded border-2 flex items-center justify-center text-xs flex-shrink-0 ${t.done
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'border-slate-300 dark:border-slate-500'
-                      }`}
-                  >
-                    {t.done && '✓'}
-                  </button>
-                  <span className={`text-sm flex-1 ${t.done ? 'line-through text-slate-400' : ''}`}>{t.title}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeatureToggles({ settings, setSettings }) {
-  function toggle(key) {
-    setSettings(s => ({ ...s, [key]: !s[key] }));
-  }
-
-  function updateColor(key, value) {
-    setSettings(s => ({ ...s, [key]: value }));
-  }
-
-  const toggles = [
-    { k: 'timeSimulator', t: '⏱️ Time Simulator' },
-    { k: 'autoAlerts', t: '🔔 Auto Alerts' },
-    { k: 'animationsEnabled', t: '✨ Animationen' }
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-        <h3 className="font-semibold mb-4">🎨 Farbschema</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400">Primärfarbe</label>
-            <div className="flex gap-2 mt-2">
-              <input
-                type="color"
-                value={settings.primaryColor}
-                onChange={(e) => updateColor('primaryColor', e.target.value)}
-                className="w-full h-10 rounded cursor-pointer"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400">Sekundärfarbe</label>
-            <div className="flex gap-2 mt-2">
-              <input
-                type="color"
-                value={settings.secondaryColor}
-                onChange={(e) => updateColor('secondaryColor', e.target.value)}
-                className="w-full h-10 rounded cursor-pointer"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-slate-600 dark:text-slate-400">Akzentfarbe</label>
-            <div className="flex gap-2 mt-2">
-              <input
-                type="color"
-                value={settings.accentColor}
-                onChange={(e) => updateColor('accentColor', e.target.value)}
-                className="w-full h-10 rounded cursor-pointer"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-        <h3 className="font-semibold mb-4">⚙️ Display-Einstellungen</h3>
-        <div className="space-y-3">
-          {[{ k: 'compactMode', t: '💾 Kompakt-Modus' }, { k: 'animationsEnabled', t: '✨ Animationen' }].map(t => (
-            <div key={t.k} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-              <div className="text-sm">{t.t}</div>
-              <button
-                onClick={() => toggle(t.k)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition ${settings[t.k]
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-200 dark:bg-slate-600'
-                  }`}
-              >
-                {settings[t.k] ? 'An' : 'Aus'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-        <h3 className="font-semibold mb-4">🧪 Experimentelle Features</h3>
-        <div className="space-y-3">
-          {toggles.map(t => (
-            <div key={t.k} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-              <div className="text-sm">{t.t}</div>
-              <button
-                onClick={() => toggle(t.k)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition ${settings[t.k]
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-slate-200 dark:bg-slate-600'
-                  }`}
-              >
-                {settings[t.k] ? 'Aktiv' : 'Inaktiv'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// The FeatureToggles component has been extracted to Schultracker/components/FeatureToggles.js
 
 function BetaApp() {
   const [active, setActive] = useState('Dashboard');
@@ -636,6 +148,17 @@ function BetaApp() {
     r.readAsText(f);
   }
 
+  function handleReset() {
+    if (confirm('Bist du sicher, dass du alle Daten zurücksetzen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      localStorage.removeItem('beta_vacations');
+      localStorage.removeItem('beta_settings');
+      localStorage.removeItem('beta_dark');
+      localStorage.removeItem('beta_todos');
+      localStorage.removeItem('beta_viewDate');
+      window.location.reload();
+    }
+  }
+
   return (
     <div className="min-h-screen" style={{ '--color-primary': settings.primaryColor, '--color-secondary': settings.secondaryColor, '--color-accent': settings.accentColor }}>
       {loadingAuth && (
@@ -687,11 +210,11 @@ function BetaApp() {
       {!loadingAuth && user && (
         <>
           <Nav active={active} onChange={setActive} dark={dark} setDark={setDark} user={user} onLogout={handleLogout} />
-          <main className={`max-w-7xl mx-auto ${settings.compactMode ? 'p-4' : 'p-6'}`}>
+          <main className={`max-w-7xl mx-auto ${settings.compactMode ? 'p-2 sm:p-4' : 'p-4 sm:p-6'}`}>
             {active === 'Dashboard' && (
               <>
-                <Dashboard now={now} vacations={vacations} todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
-                <div className="mt-8">
+                <Dashboard now={now} vacations={vacations} todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} user={user} />
+                <div className="mt-6 sm:mt-8">
                   <Calendar todos={todos} setTodos={setTodos} viewDate={viewDate} setViewDate={setViewDate} />
                 </div>
               </>
@@ -762,14 +285,19 @@ function BetaApp() {
 
                 <div className="mt-6 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
                   <h3 className="font-semibold mb-4">💾 Daten</h3>
-                  <div className="flex flex-col gap-3">
-                    <button onClick={handleExport} className="px-4 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button onClick={handleExport} className="flex-1 px-4 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">
                       📥 Alle Daten exportieren
                     </button>
-                    <label className="block">
-                      <span className="text-sm text-slate-500 block mb-2">📤 Datei importieren (JSON):</span>
+                    <label className="flex-1 block">
+                      <span className="sr-only">Datei importieren</span>
                       <input type="file" accept="application/json" onChange={handleImport} className="p-2 border border-slate-300 dark:border-slate-600 rounded-lg w-full dark:bg-slate-700" />
                     </label>
+                  </div>
+                  <div className="mt-4">
+                    <button onClick={handleReset} className="w-full px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">
+                      🔥 Alle Daten zurücksetzen
+                    </button>
                   </div>
                 </div>
               </div>
