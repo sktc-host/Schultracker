@@ -65,7 +65,7 @@ function Dashboard({ now, vacations, todos, setTodos, viewDate, setViewDate, use
             <p className="text-indigo-100 text-xs sm:text-sm mt-1">Schuljahr Fortschritt 2025/2026</p>
           </div>
           <div className="text-right flex-shrink-0 ml-4">
-            <div className="text-2xl sm:text-3xl font-bold mono-time">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div className="text-2xl sm:text-3xl font-bold mono-time">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
             <div className="text-xs text-indigo-200">{formatDate(now)}</div>
           </div>
         </div>
