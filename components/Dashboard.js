@@ -93,6 +93,16 @@ function Dashboard({ now, vacations, todos, setTodos, viewDate, setViewDate, use
 
       <div className="space-y-6">
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Schuljahr Fortschritt</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            {percent}% des Schuljahres geschafft ({passed} von {total} Schultagen)
+          </p>
+          <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-3 mt-3 overflow-hidden">
+            <div className="bg-indigo-500 h-3 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+          </div>
+        </div>
+        
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg card-hover">
           <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4">Nächste Ferien</h3>
           <div className="space-y-3">
             {Object.entries(parsedVacations).filter(([, v]) => v && v.from > now).slice(0, 3).map(([k, v]) => (
