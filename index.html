@@ -209,7 +209,7 @@
             };
 
             return (
-                <div className="w-full max-w-6xl mx-auto flex items-center justify-center min-h-screen p-4 sm:p-8">
+                <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center min-h-screen p-4 sm:p-8">
                     <div className="w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-6 sm:p-10 transition-colors duration-300">
                         <header className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-200 dark:border-slate-700">
                             <div className="flex-1 text-center md:text-left">
@@ -434,6 +434,16 @@
                         )}
                         <AlertModal message={alertMessage} onClose={() => setAlertMessage(null)} />
                     </div>
+                    
+                    {/* Beta Link & Ad Unit */}
+                    <div className="w-full text-center py-4 text-sm text-slate-500 dark:text-slate-400">
+                        <a href="beta.html" className="underline hover:text-indigo-600">Beta: Neue Funktionen ausprobieren</a>
+                    </div>
+                    <div className="ad-container w-full">
+                        <iframe data-aa="2437282" src="//acceptable.a-ads.com/2437282/?size=Adaptive" 
+                                style="border:0; padding:0; width:70%; height:auto; overflow:hidden; display:block; margin:auto">
+                        </iframe>
+                    </div>
                 </div>
             );
         }
@@ -442,15 +452,5 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
-    <div class="text-center py-4 text-sm text-slate-500 dark:text-slate-400">
-        <a href="beta.html" class="underline hover:text-indigo-600">Beta: Neue Funktionen ausprobieren</a>
-    </div>
-
-    <!-- Ad Unit: A-Ads Adaptive Banner -->
-    <div class="ad-container">
-        <iframe data-aa="2437282" src="//acceptable.a-ads.com/2437282/?size=Adaptive" 
-                style="border:0; padding:0; width:70%; height:auto; overflow:hidden; display:block; margin:auto">
-        </iframe>
-    </div>
 </body>
 </html>
