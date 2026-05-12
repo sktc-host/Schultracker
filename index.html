@@ -96,7 +96,7 @@
 
         // --- Helpers ---
         function toDateISO(s){ if(!s) return null; const d = new Date(s + "T00:00:00"); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-        function daysBetween(a,b){ const _a = new Date(a.getFullYear(), a.getMonth(), a.getDate()); const _b = new Date(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((+_b - +_a) / (1000 * 60 * 60 * 24)); }
+        function daysBetween(a,b){ const _a = new Date(a.getFullYear(), a.getMonth(), a.getDate()); const _b = new Date(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((+_b - +_a) / (1000*60*60*24)); }
         function dateAddDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
         function formatDate(d){ if(!d) return "—"; return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" }); }
         function iterateDates(from,to){ const arr=[]; let cur = new Date(from); while(cur <= to){ arr.push(new Date(cur)); cur = dateAddDays(cur,1); } return arr; }
@@ -141,7 +141,7 @@
             const [loggedInUser, setLoggedInUser] = useState(() => localStorage.getItem('logged_user') || null);
 
             useEffect(()=>{ const t = setInterval(()=>setToday(new Date()), 1000); return ()=>clearInterval(t); }, []);
-            useEffect(()=>{ localStorage.setItem('school_year', JSON.stringify(schoolYear)); localStorage.setItem('vacations', JSON.stringify(vacations)); localStorage.setItem('public_holidays', JSON.stringify(publicHolidays)); localStorage.setItem('weekly_hours', JSON.stringify(weeklyHours)); }, [schoolYear, vacations, publicHolidays, weeklyHours]);
+            useEffect(()=>{ localStorage.setItem('school_year', JSON.stringify(schoolYear)); localStorage.setItem('vacations', JSON.stringify(vacations)); localStorage.setItem('public_holidays', JSON.stringify(publicHolidays)); localStorage.setItem('weekly_hours', JSON.stringify(weeklyHours)); }, [schoolYear,vacations,publicHolidays,weeklyHours]);
             useEffect(()=>{ localStorage.setItem('dark_mode', JSON.stringify(darkMode)); if(darkMode) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); }, [darkMode]);
             useEffect(()=>{ localStorage.setItem('users', JSON.stringify(users)); }, [users]);
             useEffect(()=>{ if(loggedInUser) localStorage.setItem('logged_user', loggedInUser); else localStorage.removeItem('logged_user'); }, [loggedInUser]);
@@ -156,7 +156,7 @@
 
             function isSchoolDay(d){ const day = d.getDay(); if(day ===0 || day ===6) return false; if(parsedPublicHolidays.has(d.toDateString())) return false; for(const v of Object.values(parsedVacations)){ if(!v) continue; if(d >= v.from && d <= v.to) return false; } return true; }
 
-            function computeUntil(dateFrom, dateTo){ if(!dateTo) return null; const from = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate()); const to = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate()); let schoolDays = 0; let schoolHours = 0; let totalDays = 0; for(let d = new Date(from); d <= to; d = dateAddDays(d, 1)){ totalDays++; if(isSchoolDay(d)){ schoolDays++; const wd = d.getDay(); if(wd === 1) schoolHours += weeklyHours.monday; else if(wd === 2) schoolHours += weeklyHours.tuesday; else if(wd === 3) schoolHours += weeklyHours.wednesday; else if(wd === 4) schoolHours += weeklyHours.thursday; else if(wd === 5) schoolHours += weeklyHours.friday; } } return { totalDays, schoolDays, schoolHours }; }
+            function computeUntil(dateFrom, dateTo){ if(!dateTo) return null; const from = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate()); const to = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate()); const totalDays = daysBetween(from, to); let schoolDays=0, schoolHours=0; const days = iterateDates(from, to); for(const d of days){ if(isSchoolDay(d)) { schoolDays++; const weekday = d.getDay(); let hours=0; if(weekday===1) hours = weeklyHours.monday; if(weekday===2) hours = weeklyHours.tuesday; if(weekday===3) hours = weeklyHours.wednesday; if(weekday===4) hours = weeklyHours.thursday; if(weekday===5) hours = weeklyHours.friday; schoolHours += hours; } } return { totalDays, schoolDays, schoolHours }; }
 
             const upcomingVacations = useMemo(()=>{ const list = []; Object.entries(parsedVacations).forEach(([k,v])=>{ if(!v) return; if(v.to < adjustedNow) return; list.push({ name: k, from: v.from, to: v.to }); }); return list; }, [parsedVacations, adjustedNow]);
 
@@ -169,11 +169,11 @@
 
             const todaySchoolHours = useMemo(()=>{ if(!isSchoolDay(adjustedNow)) return 0; const weekday = adjustedNow.getDay(); let hours=0; if(weekday===1) hours = weeklyHours.monday; if(weekday===2) hours = weeklyHours.tuesday; if(weekday===3) hours = weeklyHours.wednesday; if(weekday===4) hours = weeklyHours.thursday; if(weekday===5) hours = weeklyHours.friday; return hours; }, [adjustedNow, weeklyHours]);
 
-            const percentDayComplete = useMemo(()=>{ if(!isSchoolDay(adjustedNow) || todaySchoolHours === 0) return 0; const relevantHours = SCHOOL_HOURS.filter(h => h.nr <= todaySchoolHours); if(relevantHours.length === 0) return 0; const lastHour = relevantHours[relevantHours.length - 1]; const currentTime = adjustedNow.toTimeString().slice(0,5); const [hh, mm] = currentTime.split(':').map(Number); const currentMinutes = hh * 60 + mm; const [lh, lm] = lastHour.end.split(':').map(Number); const lastMinutes = lh * 60 + lm; const schoolStartTime = SCHOOL_HOURS[0].start.split(':').map(Number); const schoolStartMinutes = schoolStartTime[0] * 60 + schoolStartTime[1]; const totalSchoolMinutes = lastMinutes - schoolStartMinutes; const passedMinutes = Math.max(0, Math.min(currentMinutes - schoolStartMinutes, totalSchoolMinutes)); return Math.round((passedMinutes / totalSchoolMinutes) * 100); }, [adjustedNow, todaySchoolHours]);
+            const percentDayComplete = useMemo(()=>{ if(!isSchoolDay(adjustedNow) || todaySchoolHours === 0) return 0; const relevantHours = SCHOOL_HOURS.filter(h => h.nr <= todaySchoolHours); if(relevantHours.length === 0) return 0; const lastHour = relevantHours[relevantHours.length - 1]; const endTime = lastHour.end; const now = adjustedNow.toTimeString().slice(0,5); if(now < relevantHours[0].start) return 0; if(now >= endTime) return 100; const schoolEnd = new Date(adjustedNow); const [h,m] = endTime.split(':'); schoolEnd.setHours(parseInt(h), parseInt(m), 0); const schoolStart = new Date(adjustedNow); const [sh,sm] = relevantHours[0].start.split(':'); schoolStart.setHours(parseInt(sh), parseInt(sm), 0); const totalMs = schoolEnd.getTime() - schoolStart.getTime(); const passedMs = adjustedNow.getTime() - schoolStart.getTime(); return Math.round((passedMs / totalMs) * 100); }, [adjustedNow, todaySchoolHours]);
 
             // authentication helpers (local demo)
-            function registerUser(username, password){ if(!username || !password) return { ok:false, message: 'Benutzername & Passwort erforderlich' }; if(users.some(u=>u.username === username)) return { ok:false, message: 'Benutzer existiert bereits' }; setUsers([...users, { username, password }]); return { ok:true }; }
-            function loginUser(username, password){ const found = users.find(u=>u.username === username && u.password === password); if(found){ setLoggedInUser(found.username); return { ok:true }; } return { ok:false, message: 'Ungültige Anmeldedaten' }; }
+            function registerUser(username, password){ if(!username || !password) return { ok:false, message: 'Benutzername & Passwort erforderlich' }; if(users.some(u=>u.username === username)) return { ok:false, message: 'Benutzername existiert bereits' }; setUsers([...users, { username, password }]); return { ok:true }; }
+            function loginUser(username, password){ const found = users.find(u=>u.username === username && u.password === password); if(found){ setLoggedInUser(found.username); return { ok:true }; } return { ok:false, message: 'Falscher Benutzername oder Passwort' }; }
             function logoutUser(){ setLoggedInUser(null); }
 
             // UI state for forms
@@ -235,7 +235,7 @@
                                     ) : (
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-slate-500">Angemeldet als <strong>{loggedInUser}</strong></span>
-                                            <button className="px-4 py-2 text-sm font-medium rounded-full bg-red-500 hover:bg-red-600 text-white transition-all" onClick={() => { logoutUser(); setAlertMessage('Abgemeldet'); }}>
+                                            <button className="px-4 py-2 text-sm font-medium rounded-full bg-red-500 hover:bg-red-600 text-white transition-all" onClick={() => { logoutUser(); setAlertMessage('Erfolgreich abgemeldet!'); }}>
                                                 Abmelden
                                             </button>
                                         </div>
@@ -322,7 +322,7 @@
                                             </p>
                                             {until && (
                                                 <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                                                    Noch <span className="font-bold">{until.schoolDays} Schultage</span> und <span className="font-bold">{until.schoolHours} Stunden</span> bis zum Start
+                                                    Noch <span className="font-bold">{until.schoolDays} Schultage</span> und <span className="font-bold">{until.schoolHours} Stunden</span> bis zum Start!
                                                 </p>
                                             )}
                                         </div>
@@ -383,8 +383,8 @@
                                             {Object.entries(vacations).map(([k, v]) => (
                                                 <div key={k} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-slate-100 dark:bg-slate-700/50 rounded-lg">
                                                     <div className="w-full sm:w-28 text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{k}</div>
-                                                    <input type="date" value={v.from} onChange={(e) => setVacations(prev => ({ ...prev, [k]: { ...prev[k], from: e.target.value } }))} className="w-full sm:flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700 text-sm" />
-                                                    <input type="date" value={v.to} onChange={(e) => setVacations(prev => ({ ...prev, [k]: { ...prev[k], to: e.target.value } }))} className="w-full sm:flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-700 text-sm" />
+                                                    <input type="date" value={v.from} onChange={(e) => setVacations(prev => ({ ...prev, [k]: { ...prev[k], from: e.target.value } }))} className="w-full sm:w-auto p-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-700 text-sm" />
+                                                    <input type="date" value={v.to} onChange={(e) => setVacations(prev => ({ ...prev, [k]: { ...prev[k], to: e.target.value } }))} className="w-full sm:w-auto p-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-700 text-sm" />
                                                 </div>
                                             ))}
                                         </div>
@@ -459,5 +459,12 @@
                 style="border:0; padding:0; width:70%; height:auto; overflow:hidden; display:block; margin:auto">
         </iframe>
     </div>
+
+    <!-- BEGIN AADS AD UNIT 2437294 -->
+    <div id="frame" style="width: 100%;margin: auto;position: relative; z-index: 99998;">
+        <iframe data-aa='2437294' src='//acceptable.a-ads.com/2437294/?size=Adaptive'
+                style='border:0; padding:0; width:70%; height:auto; overflow:hidden;display: block;margin: auto'></iframe>
+    </div>
+    <!-- END AADS AD UNIT 2437294 -->
 </body>
 </html>
