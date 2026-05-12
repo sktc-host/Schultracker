@@ -1,7 +1,7 @@
 function Nav({ active, onChange, dark, setDark, user, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
-  const navItems = ['Dashboard', 'Kalender', 'Stundenplan', 'Experimente', 'Einstellungen'];
+  const navItems = ['Dashboard', 'Kalender', 'Stundenplan', 'AI Chat', 'Experimente', 'Einstellungen'];
 
   return (
     <header className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30">

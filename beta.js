@@ -267,6 +267,10 @@ function BetaApp() {
               </div>
             )}
 
+            {active === 'AI Chat' && (
+              <AIChat settings={settings} setSettings={setSettings} />
+            )}
+
             {active === 'Experimente' && (
               <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
                 <h2 className="text-xl font-bold">🔬 Experimente</h2>
